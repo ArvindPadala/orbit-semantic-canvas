@@ -160,6 +160,38 @@ const styles = {
         borderStyle: "solid",
         borderColor: "var(--border-subtle)",
     },
+    deleteBtn: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        background: "rgba(239, 68, 68, 0.15)",
+        border: "1px solid rgba(239, 68, 68, 0.3)",
+        color: "rgba(239, 68, 68, 0.8)",
+        fontSize: 12,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        zIndex: 10,
+        lineHeight: 1,
+    },
+    deleteBtnHover: {
+        background: "rgba(239, 68, 68, 0.3)",
+        borderColor: "rgba(239, 68, 68, 0.6)",
+        color: "#ef4444",
+        transform: "scale(1.1)",
+    },
+    shimmerLine: {
+        height: 12,
+        borderRadius: 4,
+        background: "linear-gradient(90deg, var(--bg-input) 0%, rgba(139,92,246,0.08) 50%, var(--bg-input) 100%)",
+        backgroundSize: "200% 100%",
+        animation: "shimmer 1.5s ease-in-out infinite",
+    },
 };
 
 function WidgetRenderer({ widget, accentColor }) {
@@ -304,17 +336,25 @@ function WidgetRenderer({ widget, accentColor }) {
     }
 }
 
-function OrbitCardNode({ data }) {
+function OrbitCardNode({ data, id }) {
     const [isHovered, setIsHovered] = useState(false);
-    const { card, fadedOut } = data;
+    const [deleteHovered, setDeleteHovered] = useState(false);
+    const { card, fadedOut, onDelete } = data;
 
     // Loading state
     if (data.loading) {
         return (
             <div style={styles.loadingSkeleton} className="loading-shimmer">
-                <div style={{ height: 16, width: "60%", background: "var(--bg-input)", borderRadius: 4, marginBottom: 12 }} />
-                <div style={{ height: 10, width: "100%", background: "var(--bg-input)", borderRadius: 3, marginBottom: 8 }} />
-                <div style={{ height: 10, width: "80%", background: "var(--bg-input)", borderRadius: 3 }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ ...styles.shimmerLine, width: 28, height: 28, borderRadius: "50%" }} />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ ...styles.shimmerLine, width: "70%", marginBottom: 6 }} />
+                        <div style={{ ...styles.shimmerLine, width: "40%", height: 8 }} />
+                    </div>
+                </div>
+                <div style={{ ...styles.shimmerLine, width: "100%", marginBottom: 8 }} />
+                <div style={{ ...styles.shimmerLine, width: "85%", marginBottom: 12 }} />
+                <div style={{ ...styles.shimmerLine, width: "60%", height: 20, borderRadius: 10 }} />
             </div>
         );
     }
@@ -335,13 +375,33 @@ function OrbitCardNode({ data }) {
                 damping: 25,
             }}
             onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseLeave={() => { setIsHovered(false); setDeleteHovered(false); }}
             style={{
                 ...styles.card,
                 ...(isHovered ? styles.cardHover : {}),
                 ...(fadedOut ? { filter: "grayscale(0.5)" } : {}),
+                position: "relative",
             }}
         >
+            {/* Delete button — appears on hover */}
+            {isHovered && onDelete && (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    style={{
+                        ...styles.deleteBtn,
+                        ...(deleteHovered ? styles.deleteBtnHover : {}),
+                    }}
+                    onMouseEnter={() => setDeleteHovered(true)}
+                    onMouseLeave={() => setDeleteHovered(false)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(id);
+                    }}
+                >
+                    ✕
+                </motion.div>
+            )}
             {/* Accent bar at top */}
             <div style={{ ...styles.accentBar, background: `linear-gradient(90deg, ${card.color}, ${card.color}44)` }} />
 

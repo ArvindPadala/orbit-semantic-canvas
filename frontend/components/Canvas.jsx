@@ -165,6 +165,16 @@ function CanvasInner() {
     // Get card count (excluding magnets)
     const cardCount = nodes.filter((n) => n.type === "orbitCard").length;
 
+    // Delete a card
+    const handleDeleteCard = useCallback((cardId) => {
+        setNodes((prev) => prev.filter((n) => n.id !== cardId));
+        setEdges((prev) => prev.filter((e) => e.source !== cardId && e.target !== cardId));
+        delete cardsRef.current[cardId];
+        allEdgesRef.current = allEdgesRef.current.filter(
+            (e) => e.source !== cardId && e.target !== cardId
+        );
+    }, [setNodes, setEdges]);
+
     // Handle new content submission from InputBar
     const handleSubmit = useCallback(
         async (content, type) => {
@@ -199,7 +209,7 @@ function CanvasInner() {
                                 id: card.id,
                                 type: "orbitCard",
                                 position,
-                                data: { card, fadedOut: false },
+                                data: { card, fadedOut: false, onDelete: handleDeleteCard },
                                 draggable: true,
                             }
                             : node
@@ -339,7 +349,7 @@ function CanvasInner() {
                 </p>
             </motion.div>
 
-            {/* Empty state */}
+            {/* Empty state with onboarding */}
             <AnimatePresence>
                 {cardCount === 0 && !isLoading && (
                     <motion.div
@@ -368,16 +378,47 @@ function CanvasInner() {
                                 fontSize: 24,
                                 fontWeight: 600,
                                 color: "var(--text-primary)",
-                                marginBottom: 8,
+                                marginBottom: 12,
                             }}
                         >
                             Your canvas is empty
                         </h2>
-                        <p style={{ fontSize: 14, color: "var(--text-muted)", maxWidth: 360 }}>
+                        <p style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 360, lineHeight: 1.6 }}>
                             Drop a URL, type a thought, or paste an idea below.
                             <br />
                             Claude will turn it into an interactive card.
                         </p>
+                        <div style={{
+                            display: "flex",
+                            gap: 24,
+                            marginTop: 28,
+                            justifyContent: "center",
+                        }}>
+                            {[
+                                { icon: "✍️", label: "Type anything", sub: "ideas, notes, links" },
+                                { icon: "🌀", label: "Re-orbit", sub: "cards cluster by meaning" },
+                                { icon: "🧲", label: "Add magnet", sub: "filter by constraints" },
+                            ].map((step, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3 + i * 0.15 }}
+                                    style={{
+                                        padding: "12px 16px",
+                                        borderRadius: "var(--radius-md)",
+                                        background: "var(--bg-glass)",
+                                        borderWidth: 1,
+                                        borderStyle: "solid",
+                                        borderColor: "var(--border-subtle)",
+                                    }}
+                                >
+                                    <div style={{ fontSize: 20, marginBottom: 4 }}>{step.icon}</div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{step.label}</div>
+                                    <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{step.sub}</div>
+                                </motion.div>
+                            ))}
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

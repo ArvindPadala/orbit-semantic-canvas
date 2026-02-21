@@ -72,15 +72,6 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 5. **Type a constraint** in the magnet and press Enter
 6. **Drag cards** freely — they'll re-attract on "Re-orbit"
 
-## 🏆 Judging Score Strategy
-
-| Criteria | Approach |
-|----------|----------|
-| **Interface Novelty** | Semantic gravity, magnet tool — no chat windows |
-| **Theme Alignment** | Claude drives the UI (what widgets to show), not just content |
-| **Working Prototype** | Full loop: input → card → gravity → magnet |
-| **Claude Integration** | Claude decides card structure + evaluates magnet relevance |
-
 ## 📁 Project Structure
 
 ```

@@ -93,7 +93,7 @@ function ToolButton({ icon, label, onClick, disabled, color }) {
     );
 }
 
-export default function Toolbar({ onAddMagnet, onReorbit, onClear, cardCount, status }) {
+export default function Toolbar({ onAddMagnet, onAddBudget, onSuggest, onExport, onReorbit, onToggleSortMode, sortMode, onClear, cardCount, status }) {
     return (
         <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -102,9 +102,41 @@ export default function Toolbar({ onAddMagnet, onReorbit, onClear, cardCount, st
             style={styles.toolbar}
         >
             <ToolButton
+                icon={sortMode === "timeline" ? "⏱️" : "✨"}
+                label={sortMode === "timeline" ? "Timeline Mode" : "Semantic Orbit"}
+                onClick={onToggleSortMode}
+                disabled={cardCount < 2}
+                color={sortMode === "timeline" ? "var(--accent-purple)" : "var(--accent-cyan)"}
+            />
+
+            <div style={styles.divider} />
+
+            <ToolButton
+                icon="🪄"
+                label="Suggest Next (AI)"
+                onClick={onSuggest}
+                disabled={cardCount === 0}
+            />
+
+            <ToolButton
+                icon="📑"
+                label="Export Itinerary"
+                onClick={onExport}
+                disabled={cardCount === 0}
+            />
+
+            <div style={styles.divider} />
+
+            <ToolButton
                 icon="🧲"
-                label="Add Magnet"
+                label="Add Filter Magnet"
                 onClick={onAddMagnet}
+            />
+
+            <ToolButton
+                icon="💰"
+                label="Add Budget Calculator"
+                onClick={onAddBudget}
             />
 
             <ToolButton

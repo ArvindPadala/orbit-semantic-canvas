@@ -43,6 +43,7 @@ class GeneratedCard(BaseModel):
     category: str  # e.g., "apartment", "restaurant", "activity", "note"
     icon: str  # emoji icon for the card
     color: str  # hex color for accent
+    time_of_day: str = "anytime" # morning, afternoon, evening, night, anytime
     widgets: list[Widget]
     raw_input: str  # original user input
     semantic_text: str  # text used for embedding
@@ -84,3 +85,17 @@ class MagnetResult(BaseModel):
 
 class MagnetResponse(BaseModel):
     results: list[MagnetResult]
+
+
+class SuggestRequest(BaseModel):
+    cards: list[dict]
+
+class SuggestResponse(BaseModel):
+    suggestions: list[str]
+
+
+class ExportRequest(BaseModel):
+    cards: list[dict]
+
+class ExportResponse(BaseModel):
+    markdown: str

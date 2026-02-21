@@ -43,7 +43,8 @@
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   width: 100%;
   overflow: hidden;
@@ -112,8 +113,15 @@ html, body {
 
 /* Loading animation */
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes float-in {
@@ -121,6 +129,7 @@ html, body {
     opacity: 0;
     transform: scale(0.8) translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -128,21 +137,30 @@ html, body {
 }
 
 @keyframes orbit-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .loading-shimmer {
   background: linear-gradient(90deg,
-    var(--bg-card) 25%,
-    var(--bg-card-hover) 50%,
-    var(--bg-card) 75%
-  );
+      var(--bg-card) 25%,
+      var(--bg-card-hover) 50%,
+      var(--bg-card) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -154,8 +172,15 @@ html, body {
 
 /* Magnet pulse */
 @keyframes magnet-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(236, 72, 153, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(236, 72, 153, 0.5); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(236, 72, 153, 0.5);
+  }
 }
 
 /* Gravity line styling */
@@ -163,4 +188,27 @@ html, body {
   stroke: rgba(139, 92, 246, 0.15);
   stroke-width: 1;
   stroke-dasharray: 4 4;
+}
+
+/* Template buttons in empty state */
+.template-btn {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.template-btn:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
 }

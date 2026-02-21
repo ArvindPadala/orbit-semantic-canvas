@@ -25,15 +25,17 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import OrbitCardNode from "./OrbitCard";
 import MagnetNode from "./Magnet";
+import BudgetMagnetNode from "./BudgetMagnet";
 import InputBar from "./InputBar";
 import Toolbar from "./Toolbar";
 import { useGravity } from "@/hooks/useGravity";
-import { generateCard, applyMagnet, healthCheck } from "@/lib/api";
+import { generateCard, applyMagnet, healthCheck, suggestNext, exportItinerary } from "@/lib/api";
 
 // Register custom node types
 const nodeTypes = {
     orbitCard: OrbitCardNode,
     magnet: MagnetNode,
+    budgetMagnet: BudgetMagnetNode,
 };
 
 // Grid-based position to avoid overlaps
@@ -58,7 +60,11 @@ function CanvasInner() {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState(null);
+    const [sortMode, setSortMode] = useState("semantic");
     const [magnetCount, setMagnetCount] = useState(0);
+    const [exportContent, setExportContent] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
+
     const { runGravityLoop, stopGravity } = useGravity();
     const cardsRef = useRef({});
     const allEdgesRef = useRef([]); // Store all edges for filtering
@@ -220,21 +226,38 @@ function CanvasInner() {
                     setNodes((currentNodes) => {
                         const cardNodes = currentNodes.filter((n) => n.type === "orbitCard" && !n.data.loading);
                         if (cardNodes.length >= 2) {
-                            runGravityLoop(currentNodes, setNodes, null, handleEdgesUpdate);
+                            runGravityLoop(currentNodes, setNodes, null, handleEdgesUpdate, sortMode);
                         }
                         return currentNodes;
                     });
-                }, 500);
-            } catch (err) {
-                console.error("Card generation failed:", err);
+                }, 100);
+            } catch (error) {
+                console.error("Failed to generate card:", error);
                 // Remove loading node on error
                 setNodes((prev) => prev.filter((n) => n.id !== tempId));
             } finally {
                 setIsLoading(false);
             }
         },
-        [setNodes, runGravityLoop]
+        [nextPosition, setNodes, cardsRef, handleEdgesUpdate]
     );
+
+    // Load sample templates
+    const loadTemplate = useCallback((templateType) => {
+        if (templateType === 'trip') {
+            handleSubmit("Historic boutique hotel in Rome, $150/night, near Colosseum, great wifi", "text");
+            setTimeout(() => handleSubmit("Roscioli Salumeria Rome: best carbonara, needs reservation, $$$", "text"), 500);
+            setTimeout(() => handleSubmit("Morning tour of Vatican museums, 3 hours", "note"), 1000);
+        } else if (templateType === 'apartment') {
+            handleSubmit("Modern 1BR in SoHo, $3500/mo, in-unit laundry, exposed brick", "text");
+            setTimeout(() => handleSubmit("Sunny studio in Williamsburg, $2900/mo, rooftop access, no pets", "text"), 500);
+            setTimeout(() => handleSubmit("Need to stay under 30min commute to midtown", "note"), 1000);
+        } else if (templateType === 'research') {
+            handleSubmit("Quantum computing principles and qubit coherence", "note");
+            setTimeout(() => handleSubmit("https://en.wikipedia.org/wiki/Quantum_entanglement", "url"), 500);
+            setTimeout(() => handleSubmit("Need a simple explanation of superposition for the presentation", "note"), 1000);
+        }
+    }, [handleSubmit]);
 
     // Add a magnet to the canvas
     const handleAddMagnet = useCallback(() => {
@@ -274,7 +297,7 @@ function CanvasInner() {
                                 });
 
                                 // Run gravity with magnet results
-                                runGravityLoop(updatedNodes, setNodes, results, handleEdgesUpdate);
+                                runGravityLoop(updatedNodes, setNodes, results, handleEdgesUpdate, sortMode);
                                 return updatedNodes;
                             });
                         } catch (err) {
@@ -287,6 +310,60 @@ function CanvasInner() {
         ]);
     }, [magnetCount, setNodes, runGravityLoop]);
 
+    // Add a budget magnet to the canvas
+    const handleAddBudgetMagnet = useCallback(() => {
+        const magnetId = `budget-magnet-${magnetCount}`;
+        setMagnetCount((c) => c + 1);
+
+        setNodes((prev) => [
+            ...prev,
+            {
+                id: magnetId,
+                type: "budgetMagnet",
+                position: { x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 100 },
+                data: {},
+                draggable: true,
+            },
+        ]);
+    }, [magnetCount, setNodes]);
+
+    // AI Suggest Next
+    const handleSuggestNext = useCallback(async () => {
+        const activeCards = Object.values(cardsRef.current);
+        if (activeCards.length === 0) return;
+
+        setIsLoading(true);
+        try {
+            const { suggestions } = await suggestNext(activeCards);
+            for (const sug of suggestions) {
+                handleSubmit(sug, "text");
+                // Wait briefly between drops for cooler staggered animation
+                await new Promise((r) => setTimeout(r, 600));
+            }
+        } catch (err) {
+            console.error("Suggest next failed:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [handleSubmit]);
+
+    // AI Itinerary Export
+    const handleExport = useCallback(async () => {
+        const activeCards = Object.values(cardsRef.current);
+        if (activeCards.length === 0) return;
+
+        setIsExporting(true);
+        try {
+            const { markdown } = await exportItinerary(activeCards);
+            setExportContent(markdown);
+        } catch (err) {
+            console.error("Export failed:", err);
+            setExportContent("Failed to generate itinerary.");
+        } finally {
+            setIsExporting(false);
+        }
+    }, []);
+
     // Re-orbit: recalculate gravity for all cards
     const handleReorbit = useCallback(() => {
         // Reset fade-out states
@@ -296,8 +373,28 @@ function CanvasInner() {
                     ? { ...node, data: { ...node.data, fadedOut: false } }
                     : node
             );
-            runGravityLoop(reset, setNodes, null, handleEdgesUpdate);
+            runGravityLoop(reset, setNodes, null, handleEdgesUpdate, sortMode);
             return reset;
+        });
+    }, [setNodes, runGravityLoop, handleEdgesUpdate, sortMode]);
+
+    // Toggle Sort Mode
+    const handleToggleSortMode = useCallback(() => {
+        setSortMode((prev) => {
+            const nextMode = prev === "semantic" ? "timeline" : "semantic";
+
+            // Re-run gravity loop immediately with new mode
+            setNodes((currentNodes) => {
+                const reset = currentNodes.map((node) =>
+                    node.type === "orbitCard"
+                        ? { ...node, data: { ...node.data, fadedOut: false } }
+                        : node
+                );
+                runGravityLoop(reset, setNodes, null, handleEdgesUpdate, nextMode);
+                return reset;
+            });
+
+            return nextMode;
         });
     }, [setNodes, runGravityLoop, handleEdgesUpdate]);
 
@@ -419,6 +516,39 @@ function CanvasInner() {
                                 </motion.div>
                             ))}
                         </div>
+
+                        {/* Sample Templates */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.8 }}
+                            style={{ marginTop: 40 }}
+                        >
+                            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Or start with a template:</p>
+                            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                                <button
+                                    onClick={() => loadTemplate('trip')}
+                                    className="template-btn"
+                                    style={{ pointerEvents: "auto" }}
+                                >
+                                    ✈️ Trip Planner
+                                </button>
+                                <button
+                                    onClick={() => loadTemplate('apartment')}
+                                    className="template-btn"
+                                    style={{ pointerEvents: "auto" }}
+                                >
+                                    🏠 Apartment Hunt
+                                </button>
+                                <button
+                                    onClick={() => loadTemplate('research')}
+                                    className="template-btn"
+                                    style={{ pointerEvents: "auto" }}
+                                >
+                                    📚 Research Topic
+                                </button>
+                            </div>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -457,11 +587,127 @@ function CanvasInner() {
             {/* Toolbar */}
             <Toolbar
                 onAddMagnet={handleAddMagnet}
+                onAddBudget={handleAddBudgetMagnet}
+                onSuggest={handleSuggestNext}
+                onExport={handleExport}
+                onToggleSortMode={handleToggleSortMode}
+                sortMode={sortMode}
                 onReorbit={handleReorbit}
                 onClear={handleClear}
                 cardCount={cardCount}
                 status={status}
             />
+
+            {/* Export Modal Overlay */}
+            <AnimatePresence>
+                {(exportContent || isExporting) && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            width: "100vw",
+                            height: "100vh",
+                            background: "rgba(10, 10, 15, 0.8)",
+                            backdropFilter: "blur(10px)",
+                            zIndex: 2000,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 40,
+                        }}
+                        onClick={() => !isExporting && setExportContent(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            style={{
+                                background: "var(--bg-card)",
+                                border: "1px solid var(--border-subtle)",
+                                borderRadius: "var(--radius-lg)",
+                                padding: 32,
+                                width: "100%",
+                                maxWidth: 800,
+                                maxHeight: "85vh",
+                                overflowY: "auto",
+                                position: "relative",
+                                boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {isExporting ? (
+                                <div style={{ textAlign: "center", padding: "40px 0" }}>
+                                    <div style={{ fontSize: 48, marginBottom: 16 }}>✨</div>
+                                    <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
+                                        Synthesizing your itinerary...
+                                    </h2>
+                                    <p style={{ color: "var(--text-muted)", marginTop: 8 }}>
+                                        Claude is writing your personalized guide.
+                                    </p>
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setExportContent(null)}
+                                        style={{
+                                            position: "absolute",
+                                            top: 24,
+                                            right: 24,
+                                            background: "rgba(255,255,255,0.1)",
+                                            border: "none",
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: "50%",
+                                            color: "var(--text-secondary)",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                    <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, paddingRight: 40 }}>
+                                        Your Trip Itinerary
+                                    </h2>
+                                    <pre style={{
+                                        whiteSpace: "pre-wrap",
+                                        fontFamily: "inherit",
+                                        fontSize: 14,
+                                        lineHeight: 1.6,
+                                        color: "var(--text-primary)"
+                                    }}>
+                                        {exportContent}
+                                    </pre>
+                                    <div style={{ marginTop: 32, display: "flex", justifyContent: "flex-end" }}>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(exportContent);
+                                                alert("Copied to clipboard!");
+                                            }}
+                                            style={{
+                                                padding: "10px 20px",
+                                                background: "var(--text-primary)",
+                                                color: "var(--bg-primary)",
+                                                borderRadius: "var(--radius-sm)",
+                                                border: "none",
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Copy to Clipboard
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Input Bar */}
             <InputBar onSubmit={handleSubmit} isLoading={isLoading} />

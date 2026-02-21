@@ -45,6 +45,34 @@ export async function applyMagnet(constraint, cardIds) {
     return res.json();
 }
 
+export async function suggestNext(cards) {
+    const res = await fetch(`${API_URL}/api/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cards }),
+    });
+
+    if (!res.ok) {
+        throw new Error("Suggest next failed");
+    }
+
+    return res.json();
+}
+
+export async function exportItinerary(cards) {
+    const res = await fetch(`${API_URL}/api/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cards }),
+    });
+
+    if (!res.ok) {
+        throw new Error("Export failed");
+    }
+
+    return res.json();
+}
+
 export async function healthCheck() {
     try {
         const res = await fetch(`${API_URL}/health`);

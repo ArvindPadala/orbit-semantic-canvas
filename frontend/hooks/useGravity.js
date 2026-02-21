@@ -26,7 +26,7 @@ export function useGravity() {
     const isRunning = useRef(false);
     const lastPairs = useRef([]);
 
-    const calculateForces = useCallback((nodes, similarities, magnetResults) => {
+    const calculateForces = useCallback((nodes, similarities, magnetResults, sortMode = "semantic") => {
         const forces = {};
 
         // Initialize forces for all nodes
@@ -38,37 +38,65 @@ export function useGravity() {
             }
         });
 
-        const cardNodes = nodes.filter((n) => n.type !== "magnet");
+        const cardNodes = nodes.filter((n) => n.type !== "magnet" && n.type !== "budgetMagnet");
 
-        // Attraction: similar cards pull toward each other
-        for (const pair of similarities) {
-            const nodeA = cardNodes.find((n) => n.id === pair.card_a);
-            const nodeB = cardNodes.find((n) => n.id === pair.card_b);
+        const isTimeline = sortMode === "timeline";
 
-            if (!nodeA || !nodeB) continue;
+        if (!isTimeline) {
+            // Attraction: similar cards pull toward each other
+            for (const pair of similarities) {
+                const nodeA = cardNodes.find((n) => n.id === pair.card_a);
+                const nodeB = cardNodes.find((n) => n.id === pair.card_b);
 
-            const dx = nodeB.position.x - nodeA.position.x;
-            const dy = nodeB.position.y - nodeA.position.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                if (!nodeA || !nodeB) continue;
 
-            if (pair.similarity > SIMILARITY_THRESHOLD) {
-                // Target distance based on similarity (higher sim = closer target)
-                const targetDist = CLUSTER_TARGET + (1 - pair.similarity) * 300;
-                const displacement = dist - targetDist;
+                const dx = nodeB.position.x - nodeA.position.x;
+                const dy = nodeB.position.y - nodeA.position.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-                // Spring force: pull toward target distance
-                const force = ATTRACTION_STRENGTH * pair.similarity * displacement / dist;
-                const fx = (dx / dist) * force;
-                const fy = (dy / dist) * force;
+                if (pair.similarity > SIMILARITY_THRESHOLD) {
+                    // Target distance based on similarity (higher sim = closer target)
+                    const targetDist = CLUSTER_TARGET + (1 - pair.similarity) * 300;
+                    const displacement = dist - targetDist;
 
-                if (forces[nodeA.id]) {
-                    forces[nodeA.id].fx += fx;
-                    forces[nodeA.id].fy += fy;
+                    // Spring force: pull toward target distance
+                    const force = ATTRACTION_STRENGTH * pair.similarity * displacement / dist;
+                    const fx = (dx / dist) * force;
+                    const fy = (dy / dist) * force;
+
+                    if (forces[nodeA.id]) {
+                        forces[nodeA.id].fx += fx;
+                        forces[nodeA.id].fy += fy;
+                    }
+                    if (forces[nodeB.id]) {
+                        forces[nodeB.id].fx -= fx;
+                        forces[nodeB.id].fy -= fy;
+                    }
                 }
-                if (forces[nodeB.id]) {
-                    forces[nodeB.id].fx -= fx;
-                    forces[nodeB.id].fy -= fy;
-                }
+            }
+        } else {
+            // Timeline sorting: arrange horizontally by time_of_day
+            const timeMap = {
+                "morning": 150,
+                "afternoon": 650,
+                "evening": 1150,
+                "night": 1650,
+                "anytime": 900,
+                "unknown": 900
+            };
+            const TIMELINE_Y = 300; // Center vertically
+            for (const node of cardNodes) {
+                const timeStr = (node.data.cardData?.time_of_day || "anytime").toLowerCase();
+                const targetX = timeMap[timeStr] || 900;
+
+                const dx = targetX - node.position.x;
+                const dy = TIMELINE_Y - node.position.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+                // Gentler pull toward their timeline buckets
+                const pullForce = ATTRACTION_STRENGTH * 0.8;
+                forces[node.id].fx += (dx / dist) * pullForce;
+                forces[node.id].fy += (dy / dist) * pullForce;
             }
         }
 
@@ -176,8 +204,8 @@ export function useGravity() {
     }, []);
 
     const runGravityLoop = useCallback(
-        async (nodes, setNodes, magnetResults = null, onEdgesUpdate = null) => {
-            const cardIds = nodes.filter((n) => n.type !== "magnet").map((n) => n.id);
+        async (nodes, setNodes, magnetResults = null, onEdgesUpdate = null, sortMode = "semantic") => {
+            const cardIds = nodes.filter((n) => n.type !== "magnet" && n.type !== "budgetMagnet").map((n) => n.id);
             if (cardIds.length < 2) return;
 
             isRunning.current = true;
@@ -188,65 +216,69 @@ export function useGravity() {
 
                 // Update edges (connection lines) based on similarity
                 if (onEdgesUpdate) {
-                    const edges = pairs
-                        .filter((p) => p.similarity > 0.05) // Show virtually all connections
-                        .sort((a, b) => a.similarity - b.similarity) // Draw strongest on top
-                        .map((p) => {
-                            // Color coding based on similarity
-                            let strokeColor, glowColor, dashStyle;
-                            const sim = p.similarity;
+                    if (sortMode === "timeline") {
+                        // Hide edges in timeline mode to keep it clean
+                        onEdgesUpdate([]);
+                    } else {
+                        const edges = pairs
+                            .filter((p) => p.similarity > 0.05) // Show virtually all connections
+                            .sort((a, b) => a.similarity - b.similarity) // Draw strongest on top
+                            .map((p) => {
+                                // Color coding based on similarity
+                                let strokeColor, glowColor, dashStyle;
+                                const sim = p.similarity;
 
-                            if (sim > 0.6) {
-                                // Strong connection — bright purple, solid
-                                strokeColor = `rgba(139, 92, 246, ${0.4 + sim * 0.4})`;
-                                glowColor = "rgba(139, 92, 246, 0.3)";
-                                dashStyle = "none";
-                            } else if (sim > 0.35) {
-                                // Medium connection — cyan, light dash
-                                strokeColor = `rgba(6, 182, 212, ${0.3 + sim * 0.3})`;
-                                glowColor = "rgba(6, 182, 212, 0.2)";
-                                dashStyle = "8 4";
-                            } else {
-                                // Weak connection — dim white, dashed
-                                strokeColor = `rgba(255, 255, 255, ${0.05 + sim * 0.15})`;
-                                glowColor = "none";
-                                dashStyle = "4 6";
-                            }
+                                if (sim > 0.6) {
+                                    // Strong connection — bright purple, solid
+                                    strokeColor = `rgba(139, 92, 246, ${0.4 + sim * 0.4})`;
+                                    glowColor = "rgba(139, 92, 246, 0.3)";
+                                    dashStyle = "none";
+                                } else if (sim > 0.35) {
+                                    // Medium connection — cyan, light dash
+                                    strokeColor = `rgba(6, 182, 212, ${0.3 + sim * 0.3})`;
+                                    glowColor = "rgba(6, 182, 212, 0.2)";
+                                    dashStyle = "8 4";
+                                } else {
+                                    // Weak connection — dim white, dashed
+                                    strokeColor = `rgba(255, 255, 255, ${0.05 + sim * 0.15})`;
+                                    glowColor = "none";
+                                    dashStyle = "4 6";
+                                }
 
-                            return {
-                                id: `edge-${p.card_a}-${p.card_b}`,
-                                source: p.card_a,
-                                target: p.card_b,
-                                type: "default",
-                                animated: sim > 0.55,
-                                style: {
-                                    stroke: strokeColor,
-                                    strokeWidth: Math.max(1, sim * 4),
-                                    strokeDasharray: dashStyle,
-                                    filter: sim > 0.5 ? `drop-shadow(0 0 4px ${glowColor})` : "none",
-                                },
-                                label: sim > 0.2 ? `${Math.round(sim * 100)}%` : "",
-                                labelStyle: {
-                                    fontSize: 10,
-                                    fill: sim > 0.5 ? "rgba(139, 92, 246, 0.9)" : "rgba(6, 182, 212, 0.7)",
-                                    fontWeight: 600,
-                                    fontFamily: "Inter, sans-serif",
-                                },
-                                labelBgStyle: {
-                                    fill: "rgba(10, 10, 15, 0.85)",
-                                    fillOpacity: 0.85,
-                                },
-                                labelBgPadding: [6, 4],
-                                labelBgBorderRadius: 6,
-                            };
-                        });
+                                return {
+                                    id: `edge-${p.card_a}-${p.card_b}`,
+                                    source: p.card_a,
+                                    target: p.card_b,
+                                    type: "default",
+                                    animated: sim > 0.55,
+                                    style: {
+                                        stroke: strokeColor,
+                                        strokeWidth: Math.max(1, sim * 4),
+                                        strokeDasharray: dashStyle,
+                                        filter: sim > 0.5 ? `drop-shadow(0 0 4px ${glowColor})` : "none",
+                                    },
+                                    label: sim > 0.2 ? `${Math.round(sim * 100)}%` : "",
+                                    labelStyle: {
+                                        fontSize: 10,
+                                        fill: sim > 0.5 ? "rgba(139, 92, 246, 0.9)" : "rgba(6, 182, 212, 0.7)",
+                                        fontWeight: 600,
+                                        fontFamily: "Inter, sans-serif",
+                                    },
+                                    labelBgStyle: {
+                                        fill: "rgba(10, 10, 15, 0.85)",
+                                        fillOpacity: 0.85,
+                                    },
+                                    labelBgPadding: [6, 4],
+                                    labelBgBorderRadius: 6,
+                                };
+                            });
 
-                    onEdgesUpdate(edges);
+                        onEdgesUpdate(edges);
+                    }
                 }
 
                 let frameCount = 0;
                 const maxFrames = 250; // ~4 seconds for visible motion
-
                 const animate = () => {
                     if (!isRunning.current || frameCount >= maxFrames) {
                         isRunning.current = false;
@@ -256,7 +288,7 @@ export function useGravity() {
                     frameCount++;
 
                     setNodes((currentNodes) => {
-                        const forces = calculateForces(currentNodes, pairs, magnetResults);
+                        const forces = calculateForces(currentNodes, pairs, magnetResults, sortMode);
                         let totalVelocity = 0;
 
                         const updated = currentNodes.map((node) => {

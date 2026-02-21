@@ -17,12 +17,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from models.schemas import (
-    CardInput, GeneratedCard,
-    EmbedRequest, EmbedResponse,
-    GravityRequest, GravityResponse, SimilarityPair,
-    MagnetRequest, MagnetResponse, MagnetResult,
-)
+from models.schemas import CardInput, GeneratedCard, EmbedRequest, EmbedResponse, GravityRequest, GravityResponse, SimilarityPair, MagnetRequest, MagnetResponse, MagnetResult, SuggestRequest, SuggestResponse, ExportRequest, ExportResponse
 from services import claude_service, embedding_service, redis_service
 
 # Load environment variables
@@ -179,6 +174,30 @@ async def apply_magnet(request: MagnetRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Magnet evaluation failed: {str(e)}")
+
+
+@app.post("/api/suggest", response_model=SuggestResponse)
+async def get_suggestions(request: SuggestRequest):
+    """
+    Get 2 new itinerary suggestions based on the cards currently on the canvas.
+    """
+    try:
+        suggestions = await claude_service.suggest_next(request.cards)
+        return SuggestResponse(suggestions=suggestions)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Suggest failed: {str(e)}")
+
+
+@app.post("/api/export", response_model=ExportResponse)
+async def export_itinerary(request: ExportRequest):
+    """
+    Export current canvas cards to a formatted Markdown itinerary.
+    """
+    try:
+        markdown = await claude_service.export_itinerary(request.cards)
+        return ExportResponse(markdown=markdown)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
 
 @app.get("/api/cards")

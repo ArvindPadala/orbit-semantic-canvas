@@ -64,6 +64,7 @@ function CanvasInner() {
     const [magnetCount, setMagnetCount] = useState(0);
     const [exportContent, setExportContent] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [templateCity, setTemplateCity] = useState("Tokyo");
 
     const { runGravityLoop, stopGravity } = useGravity();
     const cardsRef = useRef({});
@@ -243,11 +244,15 @@ function CanvasInner() {
     );
 
     // Load sample templates
-    const loadTemplate = useCallback((templateType) => {
+    const loadTemplate = useCallback((templateType, city = "Rome") => {
         if (templateType === 'trip') {
-            handleSubmit("Historic boutique hotel in Rome, $150/night, near Colosseum, great wifi", "text");
-            setTimeout(() => handleSubmit("Roscioli Salumeria Rome: best carbonara, needs reservation, $$$", "text"), 500);
-            setTimeout(() => handleSubmit("Morning tour of Vatican museums, 3 hours", "note"), 1000);
+            if (!city) return;
+
+            handleSubmit(`Historic boutique hotel in ${city}, $150/night, near city center, great wifi`, "text");
+            setTimeout(() => handleSubmit(`Highly rated local restaurant in ${city}: incredible food, needs reservation, $$$`, "text"), 500);
+            setTimeout(() => handleSubmit(`Morning guided tour of main historical sites in ${city}, 3 hours`, "note"), 1000);
+            setTimeout(() => handleSubmit(`Evening local drinks and tasting experience in ${city}`, "note"), 1500);
+            setTimeout(() => handleSubmit(`Flights to ${city} for May 12th-16th, $450 roundtrip`, "flight"), 2000);
         } else if (templateType === 'apartment') {
             handleSubmit("Modern 1BR in SoHo, $3500/mo, in-unit laundry, exposed brick", "text");
             setTimeout(() => handleSubmit("Sunny studio in Williamsburg, $2900/mo, rooftop access, no pets", "text"), 500);
@@ -525,14 +530,45 @@ function CanvasInner() {
                             style={{ marginTop: 40 }}
                         >
                             <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Or start with a template:</p>
-                            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                                <button
-                                    onClick={() => loadTemplate('trip')}
-                                    className="template-btn"
-                                    style={{ pointerEvents: "auto" }}
-                                >
-                                    ✈️ Trip Planner
-                                </button>
+                            <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
+                                <div style={{
+                                    display: "flex",
+                                    background: "rgba(255, 255, 255, 0.03)",
+                                    border: "1px solid var(--border-subtle)",
+                                    borderRadius: "var(--radius-sm)",
+                                    overflow: "hidden"
+                                }}>
+                                    <select
+                                        value={templateCity}
+                                        onChange={(e) => setTemplateCity(e.target.value)}
+                                        style={{
+                                            background: "transparent",
+                                            color: "var(--text-primary)",
+                                            padding: "8px 12px",
+                                            border: "none",
+                                            outline: "none",
+                                            borderRight: "1px solid var(--border-subtle)",
+                                            fontSize: 13,
+                                            cursor: "pointer",
+                                            WebkitAppearance: "none",
+                                            MozAppearance: "none"
+                                        }}
+                                    >
+                                        <option value="Rome" style={{ background: "#161623" }}>Rome</option>
+                                        <option value="Tokyo" style={{ background: "#161623" }}>Tokyo</option>
+                                        <option value="Paris" style={{ background: "#161623" }}>Paris</option>
+                                        <option value="New York" style={{ background: "#161623" }}>New York</option>
+                                        <option value="London" style={{ background: "#161623" }}>London</option>
+                                    </select>
+                                    <button
+                                        onClick={() => loadTemplate('trip', templateCity)}
+                                        className="template-btn"
+                                        style={{ pointerEvents: "auto", border: "none", background: "transparent", margin: 0 }}
+                                    >
+                                        ✈️ Trip Planner
+                                    </button>
+                                </div>
+
                                 <button
                                     onClick={() => loadTemplate('apartment')}
                                     className="template-btn"
